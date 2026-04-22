@@ -1,0 +1,146 @@
+import { AIChatAgent } from "@cloudflare/ai-chat";
+import {
+  streamText,
+  convertToModelMessages,
+} from "ai";
+import { initDb, type ModelConfigRow } from "./db";
+import { resolveModel } from "./models";
+import { buildSystemPrompt } from "./prompts";
+import { r2Read } from "./r2";
+import { createWikiTools } from "./tools/wiki-tools";
+import { createSourceTools } from "./tools/source-tools";
+import { createSchemaTools } from "./tools/schema-tools";
+import { createLogTools } from "./tools/log-tools";
+import { createConfigTools } from "./tools/config-tools";
+
+type WikiState = {
+  wikiId: string;
+  pageCount: number;
+  sourceCount: number;
+  lastActivity: string;
+  currentOperation: string | null;
+  pageIndex: Array<{
+    id: string;
+    title: string;
+    category: string;
+    summary: string | null;
+  }>;
+};
+
+interface Env {
+  AI: Ai;
+  WIKI_BUCKET: R2Bucket;
+  AI_GATEWAY_ID?: string;
+  OPENAI_API_KEY?: string;
+  ANTHROPIC_API_KEY?: string;
+  GOOGLE_API_KEY?: string;
+}
+
+export class WikiAgent extends AIChatAgent<Env, WikiState> {
+  initialState: WikiState = {
+    wikiId: "default",
+    pageCount: 0,
+    sourceCount: 0,
+    lastActivity: new Date().toISOString(),
+    currentOperation: null,
+    pageIndex: [],
+  };
+
+  async onStart() {
+    initDb(this.sql);
+    this.syncStateFromDb();
+  }
+
+  private syncStateFromDb() {
+    const pages =
+      this.sql<{ id: string; title: string; category: string; summary: string | null }>`SELECT id, title, category, summary FROM wiki_pages ORDER BY updated_at DESC`;
+    const sourceCount =
+      this.sql<{ count: number }>`SELECT COUNT(*) as count FROM sources`;
+
+    this.setState({
+      ...this.state,
+      pageCount: pages.length,
+      sourceCount: sourceCount[0]?.count ?? 0,
+      lastActivity: new Date().toISOString(),
+      pageIndex: pages,
+    });
+  }
+
+  private getModelConfig(tier: "fast" | "capable"): ModelConfigRow {
+    const rows =
+      this.sql<ModelConfigRow>`SELECT * FROM model_config WHERE key = ${tier}`;
+    if (rows.length === 0) {
+      return {
+        key: tier,
+        provider: "workers-ai",
+        model: "@cf/meta/llama-4-scout-17b-16e-instruct",
+        gateway_enabled: 0,
+      };
+    }
+    return rows[0];
+  }
+
+  async onChatMessage(
+    onFinish?: Parameters<AIChatAgent<Env, WikiState>["onChatMessage"]>[0],
+    options?: Parameters<AIChatAgent<Env, WikiState>["onChatMessage"]>[1],
+  ) {
+    const wikiId = this.state.wikiId;
+    const bucket = this.env.WIKI_BUCKET;
+
+    // Read schema for system prompt
+    const schemaContent = await r2Read(bucket, `${wikiId}/wiki/schema.md`);
+    const systemPrompt = buildSystemPrompt(wikiId, schemaContent);
+
+    // Build tool context
+    const toolCtx = {
+      bucket,
+      sql: this.sql,
+      wikiId,
+      onPagesChanged: () => this.syncStateFromDb(),
+    };
+
+    const capableConfig = this.getModelConfig("capable");
+    const model = resolveModel(capableConfig, this.env);
+
+    // Handle file uploads from options.body
+    const body = options?.body as
+      | { file?: { name: string; content: string } }
+      | undefined;
+    let extraMessages: Array<{ role: "user"; content: string }> = [];
+    if (body?.file) {
+      extraMessages = [
+        {
+          role: "user",
+          content: `[File uploaded: ${body.file.name}]\n\nContent:\n${body.file.content}`,
+        },
+      ];
+    }
+
+    const allTools = {
+      ...createWikiTools(toolCtx),
+      ...createSourceTools(toolCtx),
+      ...createSchemaTools(toolCtx),
+      ...createLogTools(toolCtx),
+      ...createConfigTools(toolCtx),
+    };
+
+    const result = streamText({
+      model,
+      system: systemPrompt,
+      messages: [
+        ...(await convertToModelMessages(this.messages)),
+        ...extraMessages,
+      ],
+      tools: allTools,
+      maxSteps: 15,
+      onFinish: async (result) => {
+        this.syncStateFromDb();
+        if (onFinish) {
+          await onFinish(result);
+        }
+      },
+    });
+
+    return result.toUIMessageStreamResponse();
+  }
+}
