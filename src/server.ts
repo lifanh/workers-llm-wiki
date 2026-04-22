@@ -1,5 +1,7 @@
 import { routeAgentRequest } from "agents";
 
+export { WikiAgent } from "./agent/wiki-agent";
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const response = await routeAgentRequest(request, env);
