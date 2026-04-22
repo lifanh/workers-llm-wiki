@@ -29,8 +29,7 @@ export function ChatPanel({ chat }: ChatPanelProps) {
     reader.onload = () => {
       const content = reader.result as string;
       sendMessage({
-        text: `Please ingest this file: ${file.name}`,
-        body: { file: { name: file.name, content } },
+        text: `Please ingest this file: ${file.name}\n\n---\n\n${content}`,
       });
     };
     reader.readAsText(file);
