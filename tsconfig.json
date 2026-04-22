@@ -1,0 +1,6 @@
+{
+  "extends": "agents/tsconfig",
+  "compilerOptions": {
+    "jsx": "react-jsx"
+  }
+}
