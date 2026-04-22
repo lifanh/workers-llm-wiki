@@ -14,7 +14,7 @@ export function createLogTools(ctx: ToolContext) {
     appendLog: tool({
       description:
         "Append a timestamped entry to the wiki log. Use consistent prefixes like 'ingest | Title', 'query | Question', 'lint | Summary'.",
-      parameters: z.object({
+      inputSchema: z.object({
         entry: z
           .string()
           .describe(
@@ -32,7 +32,7 @@ export function createLogTools(ctx: ToolContext) {
 
     readLog: tool({
       description: "Read the wiki activity log.",
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         const key = `${wikiId}/wiki/log.md`;
         const content = await r2Read(bucket, key);

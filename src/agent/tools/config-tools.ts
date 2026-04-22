@@ -16,7 +16,7 @@ export function createConfigTools(ctx: ToolContext) {
     modelConfig: tool({
       description:
         "Read or update the model configuration. There are two tiers: 'fast' (for simple ops like listing, classification) and 'capable' (for synthesis, complex queries). Each tier has a provider, model name, and gateway toggle.",
-      parameters: z.object({
+      inputSchema: z.object({
         action: z.enum(["read", "update"]).describe("Read or update config"),
         tier: z
           .enum(["fast", "capable"])

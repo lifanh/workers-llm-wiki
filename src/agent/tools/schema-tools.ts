@@ -14,7 +14,7 @@ export function createSchemaTools(ctx: ToolContext) {
     readSchema: tool({
       description:
         "Read the wiki schema (conventions, page formats, workflows). The schema guides how you maintain this specific wiki.",
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         const key = `${wikiId}/wiki/schema.md`;
         const content = await r2Read(bucket, key);
@@ -30,7 +30,7 @@ export function createSchemaTools(ctx: ToolContext) {
     updateSchema: tool({
       description:
         "Update the wiki schema. Use this to evolve conventions as the wiki grows.",
-      parameters: z.object({
+      inputSchema: z.object({
         content: z.string().describe("Full markdown content for schema.md"),
       }),
       execute: async ({ content }) => {

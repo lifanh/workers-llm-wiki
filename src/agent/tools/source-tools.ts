@@ -19,7 +19,7 @@ export function createSourceTools(ctx: ToolContext) {
     saveSource: tool({
       description:
         "Save a source document to storage. Use this when the user provides text to ingest or after receiving an uploaded file.",
-      parameters: z.object({
+      inputSchema: z.object({
         filename: z
           .string()
           .describe(
@@ -42,7 +42,7 @@ export function createSourceTools(ctx: ToolContext) {
 
     readSource: tool({
       description: "Read a source document from storage.",
-      parameters: z.object({
+      inputSchema: z.object({
         filename: z.string().describe("Source filename to read"),
       }),
       execute: async ({ filename }) => {
@@ -56,7 +56,7 @@ export function createSourceTools(ctx: ToolContext) {
     listSources: tool({
       description:
         "List all sources with their ingestion status. Optionally filter by status.",
-      parameters: z.object({
+      inputSchema: z.object({
         status: z
           .enum(["pending", "ingested", "failed"])
           .optional()

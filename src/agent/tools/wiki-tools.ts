@@ -20,7 +20,7 @@ export function createWikiTools(ctx: ToolContext) {
     readPage: tool({
       description:
         "Read a wiki page by its path (e.g. 'entities/some-entity' or 'overview'). Returns the full markdown content.",
-      parameters: z.object({
+      inputSchema: z.object({
         path: z
           .string()
           .describe(
@@ -38,7 +38,7 @@ export function createWikiTools(ctx: ToolContext) {
     writePage: tool({
       description:
         "Create or update a wiki page. Writes markdown to R2 and updates the SQLite index. Use this for creating new pages and updating existing ones.",
-      parameters: z.object({
+      inputSchema: z.object({
         path: z
           .string()
           .describe("Page path, e.g. 'entities/some-entity' or 'overview'"),
@@ -76,7 +76,7 @@ export function createWikiTools(ctx: ToolContext) {
 
     deletePage: tool({
       description: "Delete a wiki page from R2 and the SQLite index.",
-      parameters: z.object({
+      inputSchema: z.object({
         path: z.string().describe("Page path to delete"),
       }),
       execute: async ({ path }) => {
@@ -91,7 +91,7 @@ export function createWikiTools(ctx: ToolContext) {
     listPages: tool({
       description:
         "List wiki pages from the index. Optionally filter by category or tag. Returns page metadata, not full content.",
-      parameters: z.object({
+      inputSchema: z.object({
         category: z
           .enum(["entity", "concept", "topic", "source"])
           .optional()
@@ -133,7 +133,7 @@ export function createWikiTools(ctx: ToolContext) {
     readIndex: tool({
       description:
         "Read the full wiki index (index.md). Use this to get an overview of all pages when answering queries.",
-      parameters: z.object({}),
+      inputSchema: z.object({}),
       execute: async () => {
         const key = `${wikiId}/wiki/index.md`;
         const content = await r2Read(bucket, key);
