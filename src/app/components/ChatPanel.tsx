@@ -3,7 +3,6 @@ import type { useAgentChat } from "@cloudflare/ai-chat/react";
 
 type ChatPanelProps = {
   chat: ReturnType<typeof useAgentChat>;
-  agent: { setState: (state: unknown) => void };
 };
 
 export function ChatPanel({ chat }: ChatPanelProps) {
@@ -49,7 +48,7 @@ export function ChatPanel({ chat }: ChatPanelProps) {
           </div>
         )}
 
-        {messages.map((msg) => (
+        {messages.map((msg: any) => (
           <div
             key={msg.id}
             className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
@@ -61,7 +60,7 @@ export function ChatPanel({ chat }: ChatPanelProps) {
                   : "bg-white border border-gray-200"
               }`}
             >
-              {msg.parts.map((part, i) => {
+              {msg.parts.map((part: any, i: any) => {
                 if (part.type === "text") {
                   return (
                     <div key={i} className="whitespace-pre-wrap">

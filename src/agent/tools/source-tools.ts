@@ -7,7 +7,7 @@ type ToolContext = {
   bucket: R2Bucket;
   sql: <T = Record<string, unknown>>(
     strings: TemplateStringsArray,
-    ...values: unknown[]
+    ...values: (string | number | boolean | null)[]
   ) => T[];
   wikiId: string;
 };

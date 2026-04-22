@@ -4,15 +4,16 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import type { ModelConfigRow } from "./db";
 
-type Env = {
+type ModelEnv = {
   AI: Ai;
   AI_GATEWAY_ID?: string;
   OPENAI_API_KEY?: string;
   ANTHROPIC_API_KEY?: string;
   GOOGLE_API_KEY?: string;
+  [key: string]: unknown;
 };
 
-export function resolveModel(config: ModelConfigRow, env: Env) {
+export function resolveModel(config: ModelConfigRow, env: ModelEnv) {
   const gatewayOpts =
     config.gateway_enabled && env.AI_GATEWAY_ID
       ? { gateway: { id: env.AI_GATEWAY_ID } }

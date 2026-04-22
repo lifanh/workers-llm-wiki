@@ -5,7 +5,7 @@ import type { ModelConfigRow } from "../db";
 type ToolContext = {
   sql: <T = Record<string, unknown>>(
     strings: TemplateStringsArray,
-    ...values: unknown[]
+    ...values: (string | number | boolean | null)[]
   ) => T[];
 };
 

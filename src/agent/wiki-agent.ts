@@ -27,15 +27,6 @@ type WikiState = {
   }>;
 };
 
-interface Env {
-  AI: Ai;
-  WIKI_BUCKET: R2Bucket;
-  AI_GATEWAY_ID?: string;
-  OPENAI_API_KEY?: string;
-  ANTHROPIC_API_KEY?: string;
-  GOOGLE_API_KEY?: string;
-}
-
 export class WikiAgent extends AIChatAgent<Env, WikiState> {
   initialState: WikiState = {
     wikiId: "default",
@@ -81,8 +72,8 @@ export class WikiAgent extends AIChatAgent<Env, WikiState> {
   }
 
   async onChatMessage(
-    onFinish?: Parameters<AIChatAgent<Env, WikiState>["onChatMessage"]>[0],
-    options?: Parameters<AIChatAgent<Env, WikiState>["onChatMessage"]>[1],
+    _onFinish?: unknown,
+    options?: { body?: unknown; abortSignal?: AbortSignal },
   ) {
     const wikiId = this.state.wikiId;
     const bucket = this.env.WIKI_BUCKET;
@@ -100,7 +91,7 @@ export class WikiAgent extends AIChatAgent<Env, WikiState> {
     };
 
     const capableConfig = this.getModelConfig("capable");
-    const model = resolveModel(capableConfig, this.env);
+    const model = resolveModel(capableConfig, this.env as any) as any;
 
     // Handle file uploads from options.body
     const body = options?.body as
@@ -124,7 +115,7 @@ export class WikiAgent extends AIChatAgent<Env, WikiState> {
       ...createConfigTools(toolCtx),
     };
 
-    const result = streamText({
+    const result = (streamText as any)({
       model,
       system: systemPrompt,
       messages: [
@@ -133,11 +124,8 @@ export class WikiAgent extends AIChatAgent<Env, WikiState> {
       ],
       tools: allTools,
       maxSteps: 15,
-      onFinish: async (result) => {
+      onFinish: async () => {
         this.syncStateFromDb();
-        if (onFinish) {
-          await onFinish(result);
-        }
       },
     });
 

@@ -1,6 +1,6 @@
 type SqlTagged = <T = Record<string, unknown>>(
   strings: TemplateStringsArray,
-  ...values: unknown[]
+  ...values: (string | number | boolean | null)[]
 ) => T[];
 
 export function initDb(sql: SqlTagged): void {

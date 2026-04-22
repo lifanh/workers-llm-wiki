@@ -48,7 +48,7 @@ export default function App() {
       />
 
       <div className="flex flex-1 min-w-0">
-        <ChatPanel chat={chat} agent={agent} />
+        <ChatPanel chat={chat} />
 
         {selectedPage && (
           <PageViewer
