@@ -1,0 +1,181 @@
+# LLM Wiki
+
+A Cloudflare Workers-hosted LLM Wiki agent that incrementally builds and maintains a persistent, interlinked knowledge base through conversational AI.
+
+Based on the [LLM Wiki pattern](docs/llm-wiki.md) — instead of retrieving from raw documents at query time (RAG), the LLM **incrementally builds and maintains a persistent wiki** of structured, interlinked markdown files.
+
+## How it works
+
+- **Ingest** — Upload a source (article, notes, PDF). The agent reads it, creates wiki pages (entities, concepts, topics), updates cross-references, and maintains an index.
+- **Query** — Ask questions against the wiki. The agent finds relevant pages, synthesizes answers with citations, and optionally saves valuable answers as new pages.
+- **Lint** — Request a health check. The agent finds contradictions, orphan pages, stale claims, and missing cross-references.
+
+## Architecture
+
+```
+React SPA (useAgentChat) ←→ WebSocket ←→ WikiAgent (Durable Object)
+                                              ├── SQLite (index, metadata, config)
+                                              ├── R2 Bucket (markdown files)
+                                              ├── Workers AI (fast model)
+                                              └── AI Gateway → External LLM (capable model)
+```
+
+Each wiki instance runs as a separate Durable Object with its own SQLite database. Wiki pages are stored as markdown files in R2, preserving the file-based wiki philosophy.
+
+## Prerequisites
+
+- [Node.js](https://nodejs.org/) 18+
+- A [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier works)
+- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/) (installed as a dev dependency)
+
+## Local Development
+
+### 1. Clone and install
+
+```bash
+git clone <repo-url>
+cd workers-llm-wiki
+npm install
+```
+
+### 2. Login to Cloudflare
+
+```bash
+npx wrangler login
+```
+
+This opens a browser to authenticate. Required for Workers AI and R2 access during local dev.
+
+### 3. Create the R2 bucket
+
+```bash
+npx wrangler r2 bucket create llm-wiki
+```
+
+### 4. Start the dev server
+
+```bash
+npm run dev
+```
+
+This starts a local Vite dev server (typically at `http://localhost:5173`). The Cloudflare Vite plugin runs the Worker and Durable Object locally with access to your remote R2 bucket and Workers AI.
+
+### 5. Use it
+
+Open the URL in your browser. You'll see a chat interface with a sidebar. Try:
+
+- Type "Hello" to test basic chat
+- Upload a `.md` or `.txt` file via the 📎 button to ingest a source
+- Ask "List all pages" to see the wiki index
+- Ask "Run a lint check" to health-check the wiki
+
+## Configuration
+
+### Model configuration
+
+By default, the agent uses Workers AI (`@cf/meta/llama-4-scout-17b-16e-instruct`) for both fast and capable tiers. You can change models at runtime through chat:
+
+- *"Switch the capable model to openai gpt-4o"*
+- *"Show me the current model config"*
+- *"Set the fast model to workers-ai @cf/meta/llama-3.1-8b-instruct"*
+
+### External LLM providers (optional)
+
+To use OpenAI, Anthropic, or Google Gemini:
+
+```bash
+# For local development, create a .dev.vars file:
+cat > .dev.vars << 'EOF'
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_API_KEY=AI...
+EOF
+```
+
+Then tell the agent to switch models via chat.
+
+### AI Gateway (optional)
+
+[AI Gateway](https://developers.cloudflare.com/ai-gateway/) adds caching, logging, rate limiting, and fallback for external LLM calls.
+
+1. Go to [Cloudflare Dashboard → AI → AI Gateway](https://dash.cloudflare.com/?to=/:account/ai/ai-gateway/general)
+2. Create a gateway (e.g. `llm-wiki-gateway`)
+3. Add to `.dev.vars` for local dev:
+   ```
+   AI_GATEWAY_ID=<your-account-id>/llm-wiki-gateway
+   ```
+4. Enable per model tier via chat: *"Enable AI Gateway for the capable model"*
+
+## Deployment
+
+### 1. Set secrets (if using external providers)
+
+```bash
+# Only needed if you use OpenAI/Anthropic/Gemini
+npx wrangler secret put OPENAI_API_KEY
+npx wrangler secret put ANTHROPIC_API_KEY
+npx wrangler secret put GOOGLE_API_KEY
+npx wrangler secret put AI_GATEWAY_ID
+```
+
+### 2. Deploy
+
+```bash
+npm run deploy
+```
+
+This builds the frontend and deploys the Worker. On first deploy, Wrangler automatically:
+- Creates the Durable Object namespace
+- Runs SQLite migrations
+- Configures the R2 bucket binding
+
+Your app will be live at `https://llm-wiki.<your-subdomain>.workers.dev`.
+
+## Project Structure
+
+```
+src/
+├── server.ts                    # Worker entry point + routing
+├── client.tsx                   # React entry point
+├── agent/
+│   ├── wiki-agent.ts            # AIChatAgent subclass (core agent)
+│   ├── db.ts                    # SQLite schema + type helpers
+│   ├── models.ts                # Dynamic model resolver (Workers AI, OpenAI, etc.)
+│   ├── prompts.ts               # System prompt builder
+│   ├── r2.ts                    # R2 read/write helpers
+│   └── tools/
+│       ├── wiki-tools.ts        # readPage, writePage, deletePage, listPages, readIndex
+│       ├── source-tools.ts      # saveSource, readSource, listSources
+│       ├── schema-tools.ts      # readSchema, updateSchema
+│       ├── log-tools.ts         # appendLog, readLog
+│       └── config-tools.ts      # modelConfig (read/update)
+└── app/
+    ├── App.tsx                  # Layout shell
+    ├── styles.css               # Tailwind styles
+    └── components/
+        ├── ChatPanel.tsx        # Chat interface with streaming
+        ├── Sidebar.tsx          # Wiki page index
+        ├── PageViewer.tsx       # Markdown page viewer
+        ├── FileUpload.tsx       # Drag-and-drop file upload
+        └── WikiSelector.tsx     # Wiki instance switcher
+```
+
+## Storage
+
+- **R2** — Wiki pages and source files stored as markdown under `{wikiId}/wiki/` and `{wikiId}/sources/`
+- **SQLite** (per Durable Object) — Page index, source tracking, model config. Used for fast lookups; R2 is the source of truth for content.
+- **Chat history** — Automatically persisted by `AIChatAgent` in SQLite
+
+## Tech Stack
+
+- [Cloudflare Workers](https://developers.cloudflare.com/workers/) + [Agents SDK](https://developers.cloudflare.com/agents/)
+- [AIChatAgent](https://developers.cloudflare.com/agents/api-reference/chat-agents/) for streaming chat with message persistence
+- [R2](https://developers.cloudflare.com/r2/) for object storage
+- [Workers AI](https://developers.cloudflare.com/workers-ai/) for built-in LLM inference
+- [AI Gateway](https://developers.cloudflare.com/ai-gateway/) for observability and control
+- [Vercel AI SDK](https://sdk.vercel.ai/) for unified model interface
+- React + Vite + Tailwind CSS for the frontend
+
+## License
+
+MIT
