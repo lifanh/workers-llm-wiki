@@ -69,7 +69,42 @@ Open the URL in your browser. You'll see a chat interface with a sidebar. Try:
 - Ask "List all pages" to see the wiki index
 - Ask "Run a lint check" to health-check the wiki
 
-## Configuration
+## Configuration Reference
+
+All configurable values in one place:
+
+### `wrangler.jsonc` — Infrastructure config
+
+| Setting | Default | Description |
+|---|---|---|
+| `name` | `"llm-wiki"` | Worker name. Determines your deploy URL (`https://<name>.<subdomain>.workers.dev`) |
+| `r2_buckets[0].bucket_name` | `"llm-wiki"` | R2 bucket name. Must match what you created with `wrangler r2 bucket create` |
+| `durable_objects.bindings[0].name` | `"WikiAgent"` | Durable Object binding name. Must match the code references |
+| `compatibility_date` | `"2026-04-22"` | Cloudflare Workers compatibility date |
+
+### Environment variables / Secrets
+
+Set in `.dev.vars` for local dev, or via `npx wrangler secret put <NAME>` for production.
+
+| Variable | Required | Description |
+|---|---|---|
+| `OPENAI_API_KEY` | No | OpenAI API key. Only needed if you switch a model tier to `openai` |
+| `ANTHROPIC_API_KEY` | No | Anthropic API key. Only needed if you switch a model tier to `anthropic` |
+| `GOOGLE_API_KEY` | No | Google Gemini API key. Only needed if you switch a model tier to `gemini` |
+| `AI_GATEWAY_ID` | No | AI Gateway identifier (`<account-id>/<gateway-name>`). Enables caching, logging, rate limiting |
+
+### Agent defaults — Runtime config (stored in SQLite)
+
+These are seeded on first run and changeable via chat at any time.
+
+| Setting | Default | Description |
+|---|---|---|
+| Fast model provider | `workers-ai` | Provider for simple operations (index lookups, listing) |
+| Fast model name | `@cf/meta/llama-4-scout-17b-16e-instruct` | Model ID for the fast tier |
+| Capable model provider | `workers-ai` | Provider for synthesis, ingestion, complex queries |
+| Capable model name | `@cf/meta/llama-4-scout-17b-16e-instruct` | Model ID for the capable tier |
+| Gateway enabled | `false` (both tiers) | Whether to route through AI Gateway |
+| Wiki ID | `"default"` | Wiki instance identifier. Determines R2 key prefix (`{wikiId}/wiki/...`) |
 
 ### Model configuration
 
