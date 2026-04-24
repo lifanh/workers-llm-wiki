@@ -49,7 +49,7 @@ This opens a browser to authenticate. Required for Workers AI and R2 access duri
 ### 3. Create the R2 bucket
 
 ```bash
-npx wrangler r2 bucket create llm-wiki
+npx wrangler r2 bucket create workers-llm-wiki
 ```
 
 ### 4. Start the dev server
@@ -129,29 +129,42 @@ EOF
 
 Then tell the agent to switch models via chat.
 
-### AI Gateway (optional)
+### AI Gateway with BYOK (recommended)
 
-[AI Gateway](https://developers.cloudflare.com/ai-gateway/) adds caching, logging, rate limiting, and fallback for external LLM calls.
+[AI Gateway](https://developers.cloudflare.com/ai-gateway/) adds caching, logging, rate limiting, and fallback for external LLM calls. With [BYOK (Bring Your Own Keys)](https://developers.cloudflare.com/ai-gateway/configuration/bring-your-own-keys/), your provider API keys are stored securely in the Cloudflare dashboard — no secrets needed in your Worker or `.dev.vars`.
+
+**Setup:**
 
 1. Go to [Cloudflare Dashboard → AI → AI Gateway](https://dash.cloudflare.com/?to=/:account/ai/ai-gateway/general)
 2. Create a gateway (e.g. `llm-wiki-gateway`)
-3. Add to `.dev.vars` for local dev:
+3. Go to the **Provider Keys** section in your gateway
+4. Click **Add API Key**, select the provider (OpenAI, Anthropic, Google), paste your key, and save
+5. (Optional) [Enable Authenticated Gateway](https://developers.cloudflare.com/ai-gateway/configuration/authentication/) for security — Worker bindings are pre-authenticated, so no extra headers needed in your code
+6. Add the gateway ID to `.dev.vars` for local dev:
    ```
    AI_GATEWAY_ID=<your-account-id>/llm-wiki-gateway
    ```
-4. Enable per model tier via chat: *"Enable AI Gateway for the capable model"*
+7. Enable per model tier via chat: *"Enable AI Gateway for the capable model"*
+
+**With BYOK you do NOT need** `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GOOGLE_API_KEY` as Worker secrets — the gateway injects them automatically. You can remove those from `.dev.vars` and skip the `wrangler secret put` steps.
+
+**Key rotation** is done entirely in the dashboard — no redeployment needed. You can also store multiple keys per provider with [aliases](https://developers.cloudflare.com/ai-gateway/configuration/bring-your-own-keys/#key-aliases) for dev/prod separation.
 
 ## Deployment
 
-### 1. Set secrets (if using external providers)
+### 1. Set secrets
 
 ```bash
-# Only needed if you use OpenAI/Anthropic/Gemini
+# Always needed if using AI Gateway
+npx wrangler secret put AI_GATEWAY_ID
+
+# Only needed if NOT using BYOK (passing keys directly to providers)
 npx wrangler secret put OPENAI_API_KEY
 npx wrangler secret put ANTHROPIC_API_KEY
 npx wrangler secret put GOOGLE_API_KEY
-npx wrangler secret put AI_GATEWAY_ID
 ```
+
+> **With BYOK:** You only need `AI_GATEWAY_ID`. Provider keys are stored in the AI Gateway dashboard and injected automatically.
 
 ### 2. Deploy
 
