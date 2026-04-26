@@ -9,6 +9,7 @@ type ChatPanelProps = {
 export function ChatPanel({ chat }: ChatPanelProps) {
   const { messages, sendMessage, clearHistory, status } = chat;
   const [input, setInput] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -22,41 +23,36 @@ export function ChatPanel({ chat }: ChatPanelProps) {
     setInput("");
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    // Always reset the input so picking the same file twice still fires onChange.
     e.target.value = "";
     if (!file) return;
-
-    // Only text-based formats are supported. Binary files like PDFs cannot be
-    // ingested without a server-side extractor and would otherwise be read as
-    // garbled bytes, blow up the chat payload, and crash the page.
-    const TEXT_EXTENSIONS = [".md", ".txt", ".json", ".csv"];
-    const lowerName = file.name.toLowerCase();
-    const isTextExt = TEXT_EXTENSIONS.some((ext) => lowerName.endsWith(ext));
-    const isTextMime =
-      file.type === "" ||
-      file.type.startsWith("text/") ||
-      file.type === "application/json";
-
-    if (!isTextExt && !isTextMime) {
-      alert(
-        `Cannot ingest "${file.name}": only text files are supported (${TEXT_EXTENSIONS.join(", ")}). PDFs and other binary formats need a server-side extractor.`,
-      );
+    if (file.size > 25 * 1024 * 1024) {
+      alert(`"${file.name}" is too large (max 25 MB).`);
       return;
     }
-
-    const reader = new FileReader();
-    reader.onerror = () => {
-      alert(`Failed to read "${file.name}".`);
-    };
-    reader.onload = () => {
-      const content = reader.result as string;
+    setIsUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/ingest/file", { method: "POST", body: fd });
+      const data = (await res.json()) as
+        | { ok: true; source: { id: string; filename: string; status: string } }
+        | { ok: false; error: string };
+      if (!data.ok) {
+        alert(`Failed to ingest "${file.name}": ${data.error}`);
+        return;
+      }
       sendMessage({
-        text: `Please ingest this file: ${file.name}\n\n---\n\n${content}`,
+        text: `Ingested file "${data.source.filename}" (id: ${data.source.id}, status: ${data.source.status}). Please review and proceed.`,
       });
-    };
-    reader.readAsText(file);
+    } catch (err) {
+      alert(
+        `Failed to ingest "${file.name}": ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   return (
@@ -150,13 +146,14 @@ export function ChatPanel({ chat }: ChatPanelProps) {
       {/* Input */}
       <div className="border-t border-gray-200 p-4 bg-white">
         <form onSubmit={handleSubmit} className="flex gap-2">
-          <label className="flex items-center cursor-pointer text-gray-400 hover:text-gray-600">
+          <label className={`flex items-center cursor-pointer ${isUploading ? "opacity-50 pointer-events-none" : "text-gray-400 hover:text-gray-600"}`}>
             <span className="text-xl">📎</span>
             <input
               type="file"
               className="hidden"
-              accept=".md,.txt,.json,.csv,text/*"
+              accept=".md,.txt,.json,.csv,.pdf,text/*,application/pdf"
               onChange={handleFileUpload}
+              disabled={isUploading}
             />
           </label>
 
