@@ -34,9 +34,9 @@ export function initDb(sql: SqlTagged): void {
   const existing = sql`SELECT key FROM model_config LIMIT 1`;
   if (existing.length === 0) {
     sql`INSERT INTO model_config (key, provider, model, gateway_enabled)
-        VALUES ('fast', 'workers-ai', '@cf/meta/llama-4-scout-17b-16e-instruct', 0)`;
+        VALUES ('fast', 'workers-ai', '@cf/moonshotai/kimi-k2.6', 0)`;
     sql`INSERT INTO model_config (key, provider, model, gateway_enabled)
-        VALUES ('capable', 'workers-ai', '@cf/meta/llama-4-scout-17b-16e-instruct', 0)`;
+        VALUES ('capable', 'workers-ai', '@cf/moonshotai/kimi-k2.6', 0)`;
   }
 }
 

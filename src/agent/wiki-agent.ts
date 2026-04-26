@@ -64,7 +64,7 @@ export class WikiAgent extends AIChatAgent<Env, WikiState> {
       return {
         key: tier,
         provider: "workers-ai",
-        model: "@cf/meta/llama-4-scout-17b-16e-instruct",
+        model: "@cf/moonshotai/kimi-k2.6",
         gateway_enabled: 0,
       };
     }

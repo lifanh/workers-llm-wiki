@@ -100,15 +100,15 @@ These are seeded on first run and changeable via chat at any time.
 | Setting | Default | Description |
 |---|---|---|
 | Fast model provider | `workers-ai` | Provider for simple operations (index lookups, listing) |
-| Fast model name | `@cf/meta/llama-4-scout-17b-16e-instruct` | Model ID for the fast tier |
+| Fast model name | `@cf/moonshotai/kimi-k2.6` | Model ID for the fast tier |
 | Capable model provider | `workers-ai` | Provider for synthesis, ingestion, complex queries |
-| Capable model name | `@cf/meta/llama-4-scout-17b-16e-instruct` | Model ID for the capable tier |
+| Capable model name | `@cf/moonshotai/kimi-k2.6` | Model ID for the capable tier |
 | Gateway enabled | `false` (both tiers) | Whether to route through AI Gateway |
 | Wiki ID | `"default"` | Wiki instance identifier. Determines R2 key prefix (`{wikiId}/wiki/...`) |
 
 ### Model configuration
 
-By default, the agent uses Workers AI (`@cf/meta/llama-4-scout-17b-16e-instruct`) for both fast and capable tiers. You can change models at runtime through chat:
+By default, the agent uses Workers AI (`@cf/moonshotai/kimi-k2.6`) for both fast and capable tiers. You can change models at runtime through chat:
 
 - *"Switch the capable model to openai gpt-4o"*
 - *"Show me the current model config"*
