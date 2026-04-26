@@ -10,6 +10,9 @@ export function ChatPanel({ chat }: ChatPanelProps) {
   const { messages, sendMessage, clearHistory, status } = chat;
   const [input, setInput] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [urlInputOpen, setUrlInputOpen] = useState(false);
+  const [urlValue, setUrlValue] = useState("");
+  const [isIngestingUrl, setIsIngestingUrl] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -52,6 +55,36 @@ export function ChatPanel({ chat }: ChatPanelProps) {
       );
     } finally {
       setIsUploading(false);
+    }
+  };
+
+  const handleUrlSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const url = urlValue.trim();
+    if (!url) return;
+    setIsIngestingUrl(true);
+    try {
+      const res = await fetch("/api/ingest/url", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data = (await res.json()) as
+        | { ok: true; source: { id: string; filename: string; status: string; source_url: string } }
+        | { ok: false; error: string };
+      if (!data.ok) {
+        alert(`Failed to ingest URL: ${data.error}`);
+        return;
+      }
+      sendMessage({
+        text: `Ingested URL "${data.source.source_url}" as source ${data.source.id} (status: ${data.source.status}). Please review and proceed.`,
+      });
+      setUrlValue("");
+      setUrlInputOpen(false);
+    } catch (err) {
+      alert(`Failed to ingest URL: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsIngestingUrl(false);
     }
   };
 
@@ -145,7 +178,36 @@ export function ChatPanel({ chat }: ChatPanelProps) {
 
       {/* Input */}
       <div className="border-t border-gray-200 p-4 bg-white">
+        {urlInputOpen && (
+          <form onSubmit={handleUrlSubmit} className="flex gap-2 mb-2">
+            <input
+              type="url"
+              placeholder="https://example.com/article"
+              value={urlValue}
+              onChange={(e) => setUrlValue(e.target.value)}
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isIngestingUrl}
+              autoFocus
+            />
+            <button
+              type="submit"
+              disabled={isIngestingUrl || !urlValue.trim()}
+              className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isIngestingUrl ? "Ingesting..." : "Ingest"}
+            </button>
+          </form>
+        )}
         <form onSubmit={handleSubmit} className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setUrlInputOpen((v) => !v)}
+            className="text-gray-400 hover:text-gray-600 text-xl"
+            title="Ingest a web URL"
+            disabled={isIngestingUrl}
+          >
+            🔗
+          </button>
           <label className={`flex items-center cursor-pointer ${isUploading ? "opacity-50 pointer-events-none" : "text-gray-400 hover:text-gray-600"}`}>
             <span className="text-xl">📎</span>
             <input
