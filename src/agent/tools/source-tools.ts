@@ -48,7 +48,12 @@ export function createSourceTools(ctx: ToolContext) {
         filename: z.string().describe("Source filename to read"),
       }),
       execute: async ({ filename }) => {
-        const key = `${wikiId}/sources/${filename}`;
+        const id = filename.replace(/\.[^.]+$/, "");
+        const rows =
+          sql<SourceRow>`SELECT * FROM sources WHERE filename = ${filename} OR id = ${id} LIMIT 1`;
+        const row = rows[0] as SourceRow | undefined;
+        const key =
+          row?.parsed_r2_key ?? `${wikiId}/sources/${filename}`;
         const content = await r2Read(bucket, key);
         if (!content) return { error: `Source not found: ${filename}` };
         return { filename, content };
