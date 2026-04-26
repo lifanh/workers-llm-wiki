@@ -39,3 +39,22 @@ export async function r2Append(
   const updated = existing ? existing + "\n" + content : content;
   await r2Write(bucket, key, updated);
 }
+
+export async function r2WriteBytes(
+  bucket: R2Bucket,
+  key: string,
+  bytes: ArrayBuffer | Uint8Array,
+  mimeType?: string,
+): Promise<void> {
+  const body = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  await bucket.put(key, body, {
+    httpMetadata: mimeType ? { contentType: mimeType } : undefined,
+  });
+}
+
+export async function r2GetObject(
+  bucket: R2Bucket,
+  key: string,
+): Promise<R2ObjectBody | null> {
+  return (await bucket.get(key)) ?? null;
+}
