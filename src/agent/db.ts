@@ -37,14 +37,16 @@ export function initDb(sql: SqlTagged, env?: Record<string, unknown>): void {
   if (existing.length === 0) {
     const fastProvider = (env?.DEFAULT_FAST_MODEL_PROVIDER as string | undefined) ?? DEFAULT_MODEL_PROVIDER;
     const fastModel = (env?.DEFAULT_FAST_MODEL_NAME as string | undefined) ?? DEFAULT_MODEL_NAME;
+    const fastGatewayEnabled = env?.DEFAULT_FAST_GATEWAY_ENABLED === 'true' ? 1 : 0;
     
     const capableProvider = (env?.DEFAULT_CAPABLE_MODEL_PROVIDER as string | undefined) ?? DEFAULT_MODEL_PROVIDER;
     const capableModel = (env?.DEFAULT_CAPABLE_MODEL_NAME as string | undefined) ?? DEFAULT_MODEL_NAME;
+    const capableGatewayEnabled = env?.DEFAULT_CAPABLE_GATEWAY_ENABLED === 'true' ? 1 : 0;
 
     sql`INSERT INTO model_config (key, provider, model, gateway_enabled)
-        VALUES ('fast', ${fastProvider}, ${fastModel}, 0)`;
+        VALUES ('fast', ${fastProvider}, ${fastModel}, ${fastGatewayEnabled})`;
     sql`INSERT INTO model_config (key, provider, model, gateway_enabled)
-        VALUES ('capable', ${capableProvider}, ${capableModel}, 0)`;
+        VALUES ('capable', ${capableProvider}, ${capableModel}, ${capableGatewayEnabled})`;
   }
 }
 

@@ -134,12 +134,18 @@ GOOGLE_API_KEY=AI...
 
 [AI Gateway](https://developers.cloudflare.com/ai-gateway/) adds caching, logging, rate limiting, and fallback for external LLM calls. With [BYOK (Bring Your Own Keys)](https://developers.cloudflare.com/ai-gateway/configuration/bring-your-own-keys/), your provider API keys are stored in the Cloudflare dashboard — **no secrets needed in your Worker**.
 
+This project routes through AI Gateway using the [Vercel AI SDK integration](https://developers.cloudflare.com/ai-gateway/integrations/vercel-ai-sdk/) (`ai-gateway-provider`) and the [unified OpenAI-compatible `/compat` endpoint](https://developers.cloudflare.com/ai-gateway/usage/chat-completion/), so a single configuration works for OpenAI, Anthropic, Google Gemini, Workers AI, and more.
+
 1. Go to [Cloudflare Dashboard → AI → AI Gateway](https://dash.cloudflare.com/?to=/:account/ai/ai-gateway/general) and create a gateway (e.g. `workers-llm-wiki-gateway`)
 2. In the gateway's **Provider Keys** section, click **Add API Key**, select the provider, paste your key, and save
-3. Set the gateway ID as a secret:
+3. Set the gateway identifiers as secrets:
    ```bash
-   npx wrangler secret put AI_GATEWAY_ID
-   # Value format: <your-account-id>/workers-llm-wiki-gateway
+   npx wrangler secret put CLOUDFLARE_ACCOUNT_ID
+   # Your Cloudflare account ID (32-char hex)
+   npx wrangler secret put AI_GATEWAY_NAME
+   # e.g. workers-llm-wiki-gateway
+   npx wrangler secret put AI_GATEWAY_TOKEN
+   # Optional: only if you configured the gateway with an auth token
    ```
 4. Deploy:
    ```bash
@@ -148,6 +154,13 @@ GOOGLE_API_KEY=AI...
 5. Enable per tier via chat: *"Enable AI Gateway for the capable model"*
 
 With BYOK you do **not** need `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GOOGLE_API_KEY` as Worker secrets — the gateway injects them automatically. Key rotation is done entirely in the dashboard with no redeployment.
+
+> **Under the hood:** when AI Gateway is enabled for a tier, the agent builds the model with
+> ```ts
+> const aigateway = createAiGateway({ accountId, gateway, apiKey });
+> const unified = createUnified();
+> aigateway(unified(`${provider}/${model}`)); // e.g. "google-ai-studio/gemini-2.5-pro"
+> ```
 
 ## Configuration Reference
 
@@ -168,7 +181,16 @@ Set in `.dev.vars` for local dev, or via `npx wrangler secret put <NAME>` for pr
 | `OPENAI_API_KEY` | Only for Path B with OpenAI | OpenAI API key |
 | `ANTHROPIC_API_KEY` | Only for Path B with Anthropic | Anthropic API key |
 | `GOOGLE_API_KEY` | Only for Path B with Gemini | Google Gemini API key |
-| `AI_GATEWAY_ID` | Only for Path C | AI Gateway identifier (`<account-id>/<gateway-name>`) |
+| `CLOUDFLARE_ACCOUNT_ID` | Only for Path C | Your Cloudflare account ID |
+| `AI_GATEWAY_NAME` | Only for Path C | The AI Gateway name |
+| `AI_GATEWAY_ID` | Legacy (Path C) | `<account-id>/<gateway-name>` — used as a fallback if the two vars above are unset |
+| `AI_GATEWAY_TOKEN` | Optional | `cf-aig-authorization` token if your gateway requires auth |
+| `DEFAULT_FAST_MODEL_PROVIDER` | Optional | Initial provider for the fast model |
+| `DEFAULT_FAST_MODEL_NAME` | Optional | Initial name for the fast model |
+| `DEFAULT_FAST_GATEWAY_ENABLED` | Optional | Set `"true"` to initially enable AI Gateway for fast model |
+| `DEFAULT_CAPABLE_MODEL_PROVIDER` | Optional | Initial provider for the capable model |
+| `DEFAULT_CAPABLE_MODEL_NAME` | Optional | Initial name for the capable model |
+| `DEFAULT_CAPABLE_GATEWAY_ENABLED`| Optional | Set `"true"` to initially enable AI Gateway for capable model |
 
 ### Runtime Config (changeable via chat)
 

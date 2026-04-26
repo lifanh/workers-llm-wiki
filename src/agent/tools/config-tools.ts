@@ -23,10 +23,23 @@ export function createConfigTools(ctx: ToolContext) {
           .optional()
           .describe("Which model tier to read/update"),
         provider: z
-          .enum(["workers-ai", "openai", "anthropic", "gemini"])
+          .enum([
+            "workers-ai",
+            "openai",
+            "anthropic",
+            "gemini",
+            "google-vertex-ai",
+          ])
           .optional()
-          .describe("Provider to set (for update)"),
-        model: z.string().optional().describe("Model name to set (for update)"),
+          .describe(
+            "Provider to set (for update). 'google-vertex-ai' requires gatewayEnabled=true.",
+          ),
+        model: z
+          .string()
+          .optional()
+          .describe(
+            "Model name to set (for update). For google-vertex-ai use ids like 'google/gemini-3.1-flash-lite-preview'.",
+          ),
         gatewayEnabled: z
           .boolean()
           .optional()

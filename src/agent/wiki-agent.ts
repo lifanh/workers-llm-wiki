@@ -44,8 +44,14 @@ export class WikiAgent extends AIChatAgent<Env, WikiState> {
     sourceIndex: [],
   };
 
+  // Bound version of `this.sql` so it can be safely passed to helpers/tools
+  // without losing its `this` binding (the underlying impl reads `this.ctx`).
+  private get boundSql() {
+    return this.sql.bind(this) as typeof this.sql;
+  }
+
   async onStart() {
-    initDb(this.sql, this.env as any);
+    initDb(this.boundSql, this.env as any);
     this.syncStateFromDb();
   }
 
@@ -93,7 +99,7 @@ export class WikiAgent extends AIChatAgent<Env, WikiState> {
     // Build tool context
     const toolCtx = {
       bucket,
-      sql: this.sql,
+      sql: this.boundSql,
       wikiId,
       onPagesChanged: () => this.syncStateFromDb(),
     };
