@@ -98,3 +98,65 @@ describe("ingestFile - pdf", () => {
     expect(row.status).toBe("ingested");
   });
 });
+
+describe("ingestFile - validation", () => {
+  test("rejects oversize file", async () => {
+    const captured: Captured[] = [];
+    const bucket = makeFakeBucket(captured);
+    const big = new Uint8Array(26 * 1024 * 1024);
+    await expect(
+      ingestFile({
+        bucket,
+        sql: makeFakeSql(),
+        ai: fakeAi,
+        wikiId: "default",
+        file: { name: "big.pdf", bytes: big, mimeType: "application/pdf" },
+      }),
+    ).rejects.toBeInstanceOf(IngestError);
+    expect(captured).toHaveLength(0); // nothing written
+  });
+
+  test("rejects unsupported mime", async () => {
+    await expect(
+      ingestFile({
+        bucket: makeFakeBucket([]),
+        sql: makeFakeSql(),
+        ai: fakeAi,
+        wikiId: "default",
+        file: { name: "x.exe", bytes: new Uint8Array([0]), mimeType: "application/x-msdownload" },
+      }),
+    ).rejects.toMatchObject({ code: "unsupported_mime" });
+  });
+});
+
+describe("ingestFile - toMarkdown failure", () => {
+  test("inserts row with status='failed', original kept, parsed missing", async () => {
+    const failingAi = {
+      toMarkdown: vi.fn(async () => [
+        { id: "x", name: "x", mimeType: "application/pdf", format: "error", error: "boom" },
+      ]),
+    } as unknown as Ai;
+    const captured: Captured[] = [];
+    const bucket = makeFakeBucket(captured);
+    const sqlCalls: string[] = [];
+    const sql: any = (strings: TemplateStringsArray) => {
+      sqlCalls.push(strings.join("?"));
+      return [];
+    };
+    const row = await ingestFile({
+      bucket,
+      sql,
+      ai: failingAi,
+      wikiId: "default",
+      now: new Date("2026-04-26T00:00:00Z"),
+      file: { name: "broken.pdf", bytes: new Uint8Array([0]), mimeType: "application/pdf" },
+    });
+
+    expect(captured.map((c) => c.key)).toEqual([
+      "default/sources/originals/2026-04-26-broken.pdf",
+    ]); // parsed NOT written
+    expect(row.status).toBe("failed");
+    expect(row.parsed_r2_key).toBeNull();
+    expect(sqlCalls.some((s) => s.includes("INSERT INTO sources"))).toBe(true);
+  });
+});
