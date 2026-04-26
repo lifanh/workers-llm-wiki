@@ -24,9 +24,32 @@ export function ChatPanel({ chat }: ChatPanelProps) {
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    // Always reset the input so picking the same file twice still fires onChange.
+    e.target.value = "";
     if (!file) return;
 
+    // Only text-based formats are supported. Binary files like PDFs cannot be
+    // ingested without a server-side extractor and would otherwise be read as
+    // garbled bytes, blow up the chat payload, and crash the page.
+    const TEXT_EXTENSIONS = [".md", ".txt", ".json", ".csv"];
+    const lowerName = file.name.toLowerCase();
+    const isTextExt = TEXT_EXTENSIONS.some((ext) => lowerName.endsWith(ext));
+    const isTextMime =
+      file.type === "" ||
+      file.type.startsWith("text/") ||
+      file.type === "application/json";
+
+    if (!isTextExt && !isTextMime) {
+      alert(
+        `Cannot ingest "${file.name}": only text files are supported (${TEXT_EXTENSIONS.join(", ")}). PDFs and other binary formats need a server-side extractor.`,
+      );
+      return;
+    }
+
     const reader = new FileReader();
+    reader.onerror = () => {
+      alert(`Failed to read "${file.name}".`);
+    };
     reader.onload = () => {
       const content = reader.result as string;
       sendMessage({
@@ -34,7 +57,6 @@ export function ChatPanel({ chat }: ChatPanelProps) {
       });
     };
     reader.readAsText(file);
-    e.target.value = "";
   };
 
   return (
@@ -133,7 +155,7 @@ export function ChatPanel({ chat }: ChatPanelProps) {
             <input
               type="file"
               className="hidden"
-              accept=".md,.txt,.pdf,.json,.csv"
+              accept=".md,.txt,.json,.csv,text/*"
               onChange={handleFileUpload}
             />
           </label>
