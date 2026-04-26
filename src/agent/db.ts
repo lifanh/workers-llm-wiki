@@ -1,3 +1,5 @@
+import { DEFAULT_MODEL_PROVIDER, DEFAULT_MODEL_NAME } from "./config";
+
 type SqlTagged = <T = Record<string, unknown>>(
   strings: TemplateStringsArray,
   ...values: (string | number | boolean | null)[]
@@ -34,9 +36,9 @@ export function initDb(sql: SqlTagged): void {
   const existing = sql`SELECT key FROM model_config LIMIT 1`;
   if (existing.length === 0) {
     sql`INSERT INTO model_config (key, provider, model, gateway_enabled)
-        VALUES ('fast', 'workers-ai', '@cf/moonshotai/kimi-k2.6', 0)`;
+        VALUES ('fast', ${DEFAULT_MODEL_PROVIDER}, ${DEFAULT_MODEL_NAME}, 0)`;
     sql`INSERT INTO model_config (key, provider, model, gateway_enabled)
-        VALUES ('capable', 'workers-ai', '@cf/moonshotai/kimi-k2.6', 0)`;
+        VALUES ('capable', ${DEFAULT_MODEL_PROVIDER}, ${DEFAULT_MODEL_NAME}, 0)`;
   }
 }
 

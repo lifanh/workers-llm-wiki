@@ -3,6 +3,7 @@ import {
   streamText,
   convertToModelMessages,
 } from "ai";
+import { DEFAULT_MODEL_PROVIDER, DEFAULT_MODEL_NAME } from "./config";
 import { initDb, type ModelConfigRow } from "./db";
 import { resolveModel } from "./models";
 import { buildSystemPrompt } from "./prompts";
@@ -63,8 +64,8 @@ export class WikiAgent extends AIChatAgent<Env, WikiState> {
     if (rows.length === 0) {
       return {
         key: tier,
-        provider: "workers-ai",
-        model: "@cf/moonshotai/kimi-k2.6",
+        provider: DEFAULT_MODEL_PROVIDER,
+        model: DEFAULT_MODEL_NAME,
         gateway_enabled: 0,
       };
     }
