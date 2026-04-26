@@ -5,7 +5,7 @@ type SqlTagged = <T = Record<string, unknown>>(
   ...values: (string | number | boolean | null)[]
 ) => T[];
 
-export function initDb(sql: SqlTagged): void {
+export function initDb(sql: SqlTagged, env?: Record<string, unknown>): void {
   sql`CREATE TABLE IF NOT EXISTS wiki_pages (
     id TEXT PRIMARY KEY,
     title TEXT NOT NULL,
@@ -35,10 +35,16 @@ export function initDb(sql: SqlTagged): void {
   // Seed default model config if empty
   const existing = sql`SELECT key FROM model_config LIMIT 1`;
   if (existing.length === 0) {
+    const fastProvider = (env?.DEFAULT_FAST_MODEL_PROVIDER as string | undefined) ?? DEFAULT_MODEL_PROVIDER;
+    const fastModel = (env?.DEFAULT_FAST_MODEL_NAME as string | undefined) ?? DEFAULT_MODEL_NAME;
+    
+    const capableProvider = (env?.DEFAULT_CAPABLE_MODEL_PROVIDER as string | undefined) ?? DEFAULT_MODEL_PROVIDER;
+    const capableModel = (env?.DEFAULT_CAPABLE_MODEL_NAME as string | undefined) ?? DEFAULT_MODEL_NAME;
+
     sql`INSERT INTO model_config (key, provider, model, gateway_enabled)
-        VALUES ('fast', ${DEFAULT_MODEL_PROVIDER}, ${DEFAULT_MODEL_NAME}, 0)`;
+        VALUES ('fast', ${fastProvider}, ${fastModel}, 0)`;
     sql`INSERT INTO model_config (key, provider, model, gateway_enabled)
-        VALUES ('capable', ${DEFAULT_MODEL_PROVIDER}, ${DEFAULT_MODEL_NAME}, 0)`;
+        VALUES ('capable', ${capableProvider}, ${capableModel}, 0)`;
   }
 }
 

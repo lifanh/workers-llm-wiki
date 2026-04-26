@@ -39,7 +39,7 @@ export class WikiAgent extends AIChatAgent<Env, WikiState> {
   };
 
   async onStart() {
-    initDb(this.sql);
+    initDb(this.sql, this.env as any);
     this.syncStateFromDb();
   }
 
