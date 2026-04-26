@@ -126,6 +126,130 @@ export async function ingestFile(args: IngestFileArgs): Promise<SourceRow> {
   return row;
 }
 
+const URL_OK_MIMES = new Set([
+  "text/html",
+  "application/xhtml+xml",
+  "text/plain",
+]);
+
+function isPrivateHost(hostname: string): boolean {
+  let h = hostname.toLowerCase();
+  // URL.hostname returns IPv6 wrapped in brackets, e.g. "[::1]"
+  if (h.startsWith("[") && h.endsWith("]")) h = h.slice(1, -1);
+  if (h === "localhost" || h.endsWith(".localhost")) return true;
+  if (h === "::1" || h === "0.0.0.0") return true;
+  // IPv4 literal
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (m) {
+    const [a, b] = m.slice(1).map((n) => parseInt(n, 10));
+    if (a === 10) return true;
+    if (a === 127) return true;
+    if (a === 172 && b >= 16 && b <= 31) return true;
+    if (a === 192 && b === 168) return true;
+    if (a === 169 && b === 254) return true; // link-local / metadata
+  }
+  return false;
+}
+
+type IngestUrlArgs = IngestCtx & {
+  url: string;
+  fetchImpl?: typeof fetch;
+};
+
+export async function ingestUrl(args: IngestUrlArgs): Promise<SourceRow> {
+  const { bucket, sql, ai, wikiId, url } = args;
+  const now = args.now ?? new Date();
+  const fetchImpl = args.fetchImpl ?? fetch;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new IngestError("bad_url", `Not a valid URL: ${url}`);
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+    throw new IngestError("bad_url", `Unsupported protocol: ${parsed.protocol}`);
+  }
+  if (isPrivateHost(parsed.hostname)) {
+    throw new IngestError("bad_url", `Refusing to fetch private host: ${parsed.hostname}`);
+  }
+
+  const res = await fetchImpl(url, {
+    redirect: "follow",
+    headers: {
+      "user-agent":
+        "workers-llm-wiki/1.0 (+https://github.com/lifanh/workers-llm-wiki)",
+      accept: "text/html,application/xhtml+xml,text/plain;q=0.8,*/*;q=0.5",
+    },
+  });
+  if (!res.ok) {
+    throw new IngestError(
+      "fetch_failed",
+      `Fetch returned ${res.status} ${res.statusText}`,
+    );
+  }
+  const ct = res.headers.get("content-type") ?? "";
+  const ctBase = ct.split(";")[0].trim().toLowerCase();
+  if (!URL_OK_MIMES.has(ctBase)) {
+    throw new IngestError(
+      "unsupported_mime",
+      `Unsupported content-type: ${ct}`,
+    );
+  }
+
+  const buf = new Uint8Array(await res.arrayBuffer());
+  if (buf.byteLength > MAX_URL_BYTES) {
+    throw new IngestError(
+      "too_large",
+      `URL response exceeds ${MAX_URL_BYTES} bytes`,
+    );
+  }
+
+  const id = sourceIdFromUrl(url, todayIso(now));
+  const ext = ctBase === "text/plain" ? "txt" : "html";
+  const originalKey = `${wikiId}/sources/originals/${id}.${ext}`;
+  const parsedKey = `${wikiId}/sources/parsed/${id}.md`;
+
+  await r2WriteBytes(bucket, originalKey, buf, ct);
+
+  let parsedText: string;
+  let status: "ingested" | "failed" = "ingested";
+  try {
+    if (ctBase === "text/plain") {
+      parsedText = new TextDecoder().decode(buf);
+    } else {
+      const blob = new Blob([buf as BlobPart], { type: ctBase });
+      const result = await ai.toMarkdown([{ name: `${id}.html`, blob }]);
+      const first = Array.isArray(result) ? result[0] : result;
+      if (first.format === "error") {
+        throw new IngestError("parse_failed", first.error);
+      }
+      parsedText = first.data;
+    }
+    await r2Write(bucket, parsedKey, parsedText);
+  } catch {
+    status = "failed";
+    parsedText = "";
+  }
+
+  const row: SourceRow = {
+    id,
+    filename: parsed.hostname + parsed.pathname,
+    r2_key: parsedKey,
+    source_type: "url",
+    source_url: url,
+    original_r2_key: originalKey,
+    original_mime_type: ct,
+    parsed_r2_key: status === "ingested" ? parsedKey : null,
+    status,
+    ingested_at: status === "ingested" ? now.toISOString() : null,
+    page_count: 0,
+  };
+
+  upsertRow(sql, row);
+  return row;
+}
+
 function upsertRow(sql: SqlTagged, row: SourceRow): void {
   sql`DELETE FROM sources WHERE id = ${row.id}`;
   sql`INSERT INTO sources (

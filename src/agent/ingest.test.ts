@@ -1,5 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 import { ingestFile, IngestError } from "./ingest";
+import { ingestUrl } from "./ingest";
 
 type Captured = { key: string; body: unknown; meta?: Record<string, unknown> };
 
@@ -158,5 +159,101 @@ describe("ingestFile - toMarkdown failure", () => {
     expect(row.status).toBe("failed");
     expect(row.parsed_r2_key).toBeNull();
     expect(sqlCalls.some((s) => s.includes("INSERT INTO sources"))).toBe(true);
+  });
+});
+
+describe("ingestUrl - happy path", () => {
+  test("fetches html, stores original + parsed, inserts url row", async () => {
+    (fakeAi.toMarkdown as any).mockClear();
+    const captured: Captured[] = [];
+    const bucket = makeFakeBucket(captured);
+    const html = "<html><body><h1>Hi</h1><p>Hello</p></body></html>";
+    const fetchMock = vi.fn(async () =>
+      new Response(html, {
+        status: 200,
+        headers: { "content-type": "text/html; charset=utf-8" },
+      }),
+    );
+
+    const row = await ingestUrl({
+      bucket,
+      sql: makeFakeSql(),
+      ai: fakeAi,
+      wikiId: "default",
+      now: new Date("2026-04-26T00:00:00Z"),
+      url: "https://example.com/blog/foo",
+      fetchImpl: fetchMock,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(captured[0].key).toBe(
+      "default/sources/originals/2026-04-26-example-com-foo.html",
+    );
+    expect(captured[1].key).toBe(
+      "default/sources/parsed/2026-04-26-example-com-foo.md",
+    );
+    expect(row.source_type).toBe("url");
+    expect(row.source_url).toBe("https://example.com/blog/foo");
+    expect(row.original_mime_type).toBe("text/html; charset=utf-8");
+  });
+});
+
+describe("ingestUrl - SSRF guard", () => {
+  test.each([
+    "http://localhost/",
+    "http://127.0.0.1/",
+    "http://[::1]/",
+    "http://10.0.0.5/",
+    "http://192.168.1.1/",
+    "http://169.254.169.254/",
+    "ftp://example.com/",
+    "file:///etc/passwd",
+    "not-a-url",
+  ])("rejects %s", async (bad) => {
+    await expect(
+      ingestUrl({
+        bucket: makeFakeBucket([]),
+        sql: makeFakeSql(),
+        ai: fakeAi,
+        wikiId: "default",
+        url: bad,
+        fetchImpl: vi.fn(),
+      }),
+    ).rejects.toMatchObject({ code: "bad_url" });
+  });
+});
+
+describe("ingestUrl - non-2xx and bad content-type", () => {
+  test("rejects 404", async () => {
+    const fetchMock = vi.fn(async () => new Response("nope", { status: 404 }));
+    await expect(
+      ingestUrl({
+        bucket: makeFakeBucket([]),
+        sql: makeFakeSql(),
+        ai: fakeAi,
+        wikiId: "default",
+        url: "https://example.com/x",
+        fetchImpl: fetchMock,
+      }),
+    ).rejects.toMatchObject({ code: "fetch_failed" });
+  });
+
+  test("rejects image content-type", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response(new Uint8Array([0xff, 0xd8]), {
+        status: 200,
+        headers: { "content-type": "image/jpeg" },
+      }),
+    );
+    await expect(
+      ingestUrl({
+        bucket: makeFakeBucket([]),
+        sql: makeFakeSql(),
+        ai: fakeAi,
+        wikiId: "default",
+        url: "https://example.com/x.jpg",
+        fetchImpl: fetchMock,
+      }),
+    ).rejects.toMatchObject({ code: "unsupported_mime" });
   });
 });
