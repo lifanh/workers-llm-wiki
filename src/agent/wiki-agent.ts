@@ -26,6 +26,11 @@ type WikiState = {
     category: string;
     summary: string | null;
   }>;
+  sourceIndex: Array<{
+    id: string;
+    filename: string;
+    status: string;
+  }>;
 };
 
 export class WikiAgent extends AIChatAgent<Env, WikiState> {
@@ -36,6 +41,7 @@ export class WikiAgent extends AIChatAgent<Env, WikiState> {
     lastActivity: new Date().toISOString(),
     currentOperation: null,
     pageIndex: [],
+    sourceIndex: [],
   };
 
   async onStart() {
@@ -46,15 +52,16 @@ export class WikiAgent extends AIChatAgent<Env, WikiState> {
   private syncStateFromDb() {
     const pages =
       this.sql<{ id: string; title: string; category: string; summary: string | null }>`SELECT id, title, category, summary FROM wiki_pages ORDER BY updated_at DESC`;
-    const sourceCount =
-      this.sql<{ count: number }>`SELECT COUNT(*) as count FROM sources`;
+    const sources =
+      this.sql<{ id: string; filename: string; status: string }>`SELECT id, filename, status FROM sources ORDER BY rowid DESC`;
 
     this.setState({
       ...this.state,
       pageCount: pages.length,
-      sourceCount: sourceCount[0]?.count ?? 0,
+      sourceCount: sources.length,
       lastActivity: new Date().toISOString(),
       pageIndex: pages,
+      sourceIndex: sources,
     });
   }
 
