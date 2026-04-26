@@ -5,6 +5,8 @@ import {
 } from "ai";
 import { DEFAULT_MODEL_PROVIDER, DEFAULT_MODEL_NAME } from "./config";
 import { initDb, type ModelConfigRow } from "./db";
+import { ingestFile, ingestUrl } from "./ingest";
+import type { SourceRow } from "./db";
 import { resolveModel } from "./models";
 import { buildSystemPrompt } from "./prompts";
 import { r2Read } from "./r2";
@@ -30,6 +32,8 @@ type WikiState = {
     id: string;
     filename: string;
     status: string;
+    source_type: string;
+    source_url: string | null;
   }>;
 };
 
@@ -59,7 +63,8 @@ export class WikiAgent extends AIChatAgent<Env, WikiState> {
     const pages =
       this.sql<{ id: string; title: string; category: string; summary: string | null }>`SELECT id, title, category, summary FROM wiki_pages ORDER BY updated_at DESC`;
     const sources =
-      this.sql<{ id: string; filename: string; status: string }>`SELECT id, filename, status FROM sources ORDER BY rowid DESC`;
+      this.sql<{ id: string; filename: string; status: string; source_type: string; source_url: string | null }>`
+        SELECT id, filename, status, source_type, source_url FROM sources ORDER BY rowid DESC`;
 
     this.setState({
       ...this.state,
@@ -69,6 +74,49 @@ export class WikiAgent extends AIChatAgent<Env, WikiState> {
       pageIndex: pages,
       sourceIndex: sources,
     });
+  }
+
+  async ingestFileRpc(input: {
+    name: string;
+    bytes: ArrayBuffer;
+    mimeType: string;
+  }): Promise<SourceRow> {
+    const row = await ingestFile({
+      bucket: this.env.WIKI_BUCKET,
+      sql: this.boundSql,
+      ai: this.env.AI,
+      wikiId: this.state.wikiId,
+      file: {
+        name: input.name,
+        bytes: new Uint8Array(input.bytes),
+        mimeType: input.mimeType,
+      },
+    });
+    this.syncStateFromDb();
+    return row;
+  }
+
+  async ingestUrlRpc(input: { url: string }): Promise<SourceRow> {
+    const row = await ingestUrl({
+      bucket: this.env.WIKI_BUCKET,
+      sql: this.boundSql,
+      ai: this.env.AI,
+      wikiId: this.state.wikiId,
+      url: input.url,
+    });
+    this.syncStateFromDb();
+    return row;
+  }
+
+  async getSourceRow(id: string): Promise<SourceRow | null> {
+    const rows = this.sql<SourceRow>`SELECT * FROM sources WHERE id = ${id}`;
+    return rows[0] ?? null;
+  }
+
+  async getSourceRowByFilename(filename: string): Promise<SourceRow | null> {
+    const rows =
+      this.sql<SourceRow>`SELECT * FROM sources WHERE filename = ${filename} OR id = ${filename.replace(/\.[^.]+$/, "")} LIMIT 1`;
+    return rows[0] ?? null;
   }
 
   private getModelConfig(tier: "fast" | "capable"): ModelConfigRow {
