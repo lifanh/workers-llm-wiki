@@ -77,8 +77,8 @@ All configurable values in one place:
 
 | Setting | Default | Description |
 |---|---|---|
-| `name` | `"llm-wiki"` | Worker name. Determines your deploy URL (`https://<name>.<subdomain>.workers.dev`) |
-| `r2_buckets[0].bucket_name` | `"llm-wiki"` | R2 bucket name. Must match what you created with `wrangler r2 bucket create` |
+| `name` | `"workers-llm-wiki"` | Worker name. Determines your deploy URL (`https://<name>.<subdomain>.workers.dev`) |
+| `r2_buckets[0].bucket_name` | `"workers-llm-wiki"` | R2 bucket name. Must match what you created with `wrangler r2 bucket create` |
 | `durable_objects.bindings[0].name` | `"WikiAgent"` | Durable Object binding name. Must match the code references |
 | `compatibility_date` | `"2026-04-22"` | Cloudflare Workers compatibility date |
 
@@ -136,13 +136,13 @@ Then tell the agent to switch models via chat.
 **Setup:**
 
 1. Go to [Cloudflare Dashboard → AI → AI Gateway](https://dash.cloudflare.com/?to=/:account/ai/ai-gateway/general)
-2. Create a gateway (e.g. `llm-wiki-gateway`)
+2. Create a gateway (e.g. `workers-llm-wiki-gateway`)
 3. Go to the **Provider Keys** section in your gateway
 4. Click **Add API Key**, select the provider (OpenAI, Anthropic, Google), paste your key, and save
 5. (Optional) [Enable Authenticated Gateway](https://developers.cloudflare.com/ai-gateway/configuration/authentication/) for security — Worker bindings are pre-authenticated, so no extra headers needed in your code
 6. Add the gateway ID to `.dev.vars` for local dev:
    ```
-   AI_GATEWAY_ID=<your-account-id>/llm-wiki-gateway
+   AI_GATEWAY_ID=<your-account-id>/workers-llm-wiki-gateway
    ```
 7. Enable per model tier via chat: *"Enable AI Gateway for the capable model"*
 
@@ -177,7 +177,7 @@ This builds the frontend and deploys the Worker. On first deploy, Wrangler autom
 - Runs SQLite migrations
 - Configures the R2 bucket binding
 
-Your app will be live at `https://llm-wiki.<your-subdomain>.workers.dev`.
+Your app will be live at `https://workers-llm-wiki.<your-subdomain>.workers.dev`.
 
 ## Project Structure
 
