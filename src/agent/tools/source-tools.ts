@@ -2,6 +2,7 @@ import { tool } from "ai";
 import { z } from "zod";
 import { r2Read, r2Write, r2List } from "../r2";
 import type { SourceRow } from "../db";
+import { ingestUrl as ingestUrlImpl } from "../ingest";
 
 type ToolContext = {
   bucket: R2Bucket;
@@ -10,10 +11,11 @@ type ToolContext = {
     ...values: (string | number | boolean | null)[]
   ) => T[];
   wikiId: string;
+  ai: Ai;
 };
 
 export function createSourceTools(ctx: ToolContext) {
-  const { bucket, sql, wikiId } = ctx;
+  const { bucket, sql, wikiId, ai } = ctx;
 
   return {
     saveSource: tool({
@@ -50,6 +52,37 @@ export function createSourceTools(ctx: ToolContext) {
         const content = await r2Read(bucket, key);
         if (!content) return { error: `Source not found: ${filename}` };
         return { filename, content };
+      },
+    }),
+
+    ingestUrl: tool({
+      description:
+        "Fetch a web page and ingest it as a source. Stores the original HTML and a parsed Markdown rendering. Use this when the user asks to ingest a URL.",
+      inputSchema: z.object({
+        url: z.string().url().describe("Full http(s) URL to ingest"),
+      }),
+      execute: async ({ url }) => {
+        try {
+          const row = await ingestUrlImpl({
+            bucket,
+            sql,
+            ai,
+            wikiId,
+            url,
+          });
+          return {
+            success: true,
+            id: row.id,
+            filename: row.filename,
+            source_url: row.source_url,
+            status: row.status,
+          };
+        } catch (err) {
+          return {
+            success: false,
+            error: err instanceof Error ? err.message : String(err),
+          };
+        }
       },
     }),
 

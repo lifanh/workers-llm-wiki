@@ -149,6 +149,7 @@ export class WikiAgent extends AIChatAgent<Env, WikiState> {
       bucket,
       sql: this.boundSql,
       wikiId,
+      ai: this.env.AI,
       onPagesChanged: () => this.syncStateFromDb(),
     };
 
