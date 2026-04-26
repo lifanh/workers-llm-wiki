@@ -25,6 +25,26 @@ export function initDb(sql: SqlTagged, env?: Record<string, unknown>): void {
     page_count INTEGER DEFAULT 0
   )`;
 
+  // --- migration: dual-storage columns (originals + parsed) ---
+  const sourceCols = sql<{ name: string }>`PRAGMA table_info(sources)`.map(
+    (c) => c.name,
+  );
+  const addCol = (name: string, ddl: string) => {
+    if (!sourceCols.includes(name)) {
+      // Cannot use parameter binding for ALTER TABLE.
+      // Column names/DDL are static, not user input — safe.
+      sql([`ALTER TABLE sources ADD COLUMN ${name} ${ddl}`] as unknown as TemplateStringsArray);
+    }
+  };
+  addCol("source_type", "TEXT NOT NULL DEFAULT 'text'");
+  addCol("source_url", "TEXT");
+  addCol("original_r2_key", "TEXT");
+  addCol("original_mime_type", "TEXT");
+  addCol("parsed_r2_key", "TEXT");
+
+  // Backfill: existing rows get parsed_r2_key = r2_key.
+  sql`UPDATE sources SET parsed_r2_key = r2_key WHERE parsed_r2_key IS NULL`;
+
   sql`CREATE TABLE IF NOT EXISTS model_config (
     key TEXT PRIMARY KEY,
     provider TEXT NOT NULL,
@@ -63,10 +83,15 @@ export type WikiPageRow = {
 export type SourceRow = {
   id: string;
   filename: string;
-  r2_key: string;
+  r2_key: string; // legacy; equals parsed_r2_key for new rows
   ingested_at: string | null;
   status: string;
   page_count: number;
+  source_type: string; // 'text' | 'pdf' | 'url'
+  source_url: string | null;
+  original_r2_key: string | null;
+  original_mime_type: string | null;
+  parsed_r2_key: string | null;
 };
 
 export type ModelConfigRow = {
