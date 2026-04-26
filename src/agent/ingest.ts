@@ -49,8 +49,8 @@ function extFor(mime: string, name: string): string {
   if (mime === "text/markdown") return "md";
   if (mime === "text/csv") return "csv";
   if (mime === "application/json") return "json";
-  if (mime.startsWith("text/")) return "txt";
   if (mime === "text/html" || mime === "application/xhtml+xml") return "html";
+  if (mime.startsWith("text/")) return "txt";
   const m = name.match(/\.([a-z0-9]+)$/i);
   return m ? m[1].toLowerCase() : "bin";
 }
