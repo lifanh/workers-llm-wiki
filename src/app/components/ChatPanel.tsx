@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import type { useAgentChat } from "@cloudflare/ai-chat/react";
+import ReactMarkdown from "react-markdown";
 
 type ChatPanelProps = {
   chat: ReturnType<typeof useAgentChat>;
@@ -61,9 +62,35 @@ export function ChatPanel({ chat }: ChatPanelProps) {
             >
               {msg.parts.map((part: any, i: any) => {
                 if (part.type === "text") {
+                  if (msg.role === "user") {
+                    return (
+                      <div key={i} className="whitespace-pre-wrap">
+                        {part.text}
+                      </div>
+                    );
+                  }
                   return (
-                    <div key={i} className="whitespace-pre-wrap">
-                      {part.text}
+                    <div
+                      key={i}
+                      className="prose prose-sm max-w-none prose-pre:bg-gray-100 prose-pre:text-gray-800 prose-p:my-2 prose-headings:my-3"
+                    >
+                      <ReactMarkdown
+                        components={{
+                          a: ({ href, children, ...props }) => (
+                            <a
+                              {...props}
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline"
+                            >
+                              {children}
+                            </a>
+                          ),
+                        }}
+                      >
+                        {part.text}
+                      </ReactMarkdown>
                     </div>
                   );
                 }
