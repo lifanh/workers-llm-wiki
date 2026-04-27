@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import type { useAgentChat } from "@cloudflare/ai-chat/react";
+import ReactMarkdown from "react-markdown";
 
 type ChatPanelProps = {
   chat: ReturnType<typeof useAgentChat>;
@@ -8,6 +9,10 @@ type ChatPanelProps = {
 export function ChatPanel({ chat }: ChatPanelProps) {
   const { messages, sendMessage, clearHistory, status } = chat;
   const [input, setInput] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [urlInputOpen, setUrlInputOpen] = useState(false);
+  const [urlValue, setUrlValue] = useState("");
+  const [isIngestingUrl, setIsIngestingUrl] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -21,19 +26,66 @@ export function ChatPanel({ chat }: ChatPanelProps) {
     setInput("");
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const content = reader.result as string;
-      sendMessage({
-        text: `Please ingest this file: ${file.name}\n\n---\n\n${content}`,
-      });
-    };
-    reader.readAsText(file);
     e.target.value = "";
+    if (!file) return;
+    if (file.size > 25 * 1024 * 1024) {
+      alert(`"${file.name}" is too large (max 25 MB).`);
+      return;
+    }
+    setIsUploading(true);
+    try {
+      const fd = new FormData();
+      fd.append("file", file);
+      const res = await fetch("/api/ingest/file", { method: "POST", body: fd });
+      const data = (await res.json()) as
+        | { ok: true; source: { id: string; filename: string; status: string } }
+        | { ok: false; error: string };
+      if (!data.ok) {
+        alert(`Failed to ingest "${file.name}": ${data.error}`);
+        return;
+      }
+      sendMessage({
+        text: `Ingested file "${data.source.filename}" (id: ${data.source.id}, status: ${data.source.status}). Please review and proceed.`,
+      });
+    } catch (err) {
+      alert(
+        `Failed to ingest "${file.name}": ${err instanceof Error ? err.message : String(err)}`,
+      );
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleUrlSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const url = urlValue.trim();
+    if (!url) return;
+    setIsIngestingUrl(true);
+    try {
+      const res = await fetch("/api/ingest/url", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data = (await res.json()) as
+        | { ok: true; source: { id: string; filename: string; status: string; source_url: string } }
+        | { ok: false; error: string };
+      if (!data.ok) {
+        alert(`Failed to ingest URL: ${data.error}`);
+        return;
+      }
+      sendMessage({
+        text: `Ingested URL "${data.source.source_url}" as source ${data.source.id} (status: ${data.source.status}). Please review and proceed.`,
+      });
+      setUrlValue("");
+      setUrlInputOpen(false);
+    } catch (err) {
+      alert(`Failed to ingest URL: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setIsIngestingUrl(false);
+    }
   };
 
   return (
@@ -61,9 +113,35 @@ export function ChatPanel({ chat }: ChatPanelProps) {
             >
               {msg.parts.map((part: any, i: any) => {
                 if (part.type === "text") {
+                  if (msg.role === "user") {
+                    return (
+                      <div key={i} className="whitespace-pre-wrap">
+                        {part.text}
+                      </div>
+                    );
+                  }
                   return (
-                    <div key={i} className="whitespace-pre-wrap">
-                      {part.text}
+                    <div
+                      key={i}
+                      className="prose prose-sm max-w-none prose-pre:bg-gray-100 prose-pre:text-gray-800 prose-p:my-2 prose-headings:my-3"
+                    >
+                      <ReactMarkdown
+                        components={{
+                          a: ({ href, children, ...props }) => (
+                            <a
+                              {...props}
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline"
+                            >
+                              {children}
+                            </a>
+                          ),
+                        }}
+                      >
+                        {part.text}
+                      </ReactMarkdown>
                     </div>
                   );
                 }
@@ -100,14 +178,44 @@ export function ChatPanel({ chat }: ChatPanelProps) {
 
       {/* Input */}
       <div className="border-t border-gray-200 p-4 bg-white">
+        {urlInputOpen && (
+          <form onSubmit={handleUrlSubmit} className="flex gap-2 mb-2">
+            <input
+              type="url"
+              placeholder="https://example.com/article"
+              value={urlValue}
+              onChange={(e) => setUrlValue(e.target.value)}
+              className="flex-1 border border-gray-300 rounded-lg px-3 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isIngestingUrl}
+              autoFocus
+            />
+            <button
+              type="submit"
+              disabled={isIngestingUrl || !urlValue.trim()}
+              className="bg-blue-600 text-white px-3 py-1 rounded-lg text-sm hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isIngestingUrl ? "Ingesting..." : "Ingest"}
+            </button>
+          </form>
+        )}
         <form onSubmit={handleSubmit} className="flex gap-2">
-          <label className="flex items-center cursor-pointer text-gray-400 hover:text-gray-600">
+          <button
+            type="button"
+            onClick={() => setUrlInputOpen((v) => !v)}
+            className="text-gray-400 hover:text-gray-600 text-xl"
+            title="Ingest a web URL"
+            disabled={isIngestingUrl}
+          >
+            🔗
+          </button>
+          <label className={`flex items-center cursor-pointer ${isUploading ? "opacity-50 pointer-events-none" : "text-gray-400 hover:text-gray-600"}`}>
             <span className="text-xl">📎</span>
             <input
               type="file"
               className="hidden"
-              accept=".md,.txt,.pdf,.json,.csv"
+              accept=".md,.txt,.json,.csv,.pdf,text/*,application/pdf"
               onChange={handleFileUpload}
+              disabled={isUploading}
             />
           </label>
 

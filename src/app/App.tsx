@@ -21,6 +21,8 @@ type WikiState = {
     id: string;
     filename: string;
     status: string;
+    source_type: string;
+    source_url: string | null;
   }>;
 };
 

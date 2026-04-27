@@ -9,6 +9,8 @@ type SourceEntry = {
   id: string;
   filename: string;
   status: string;
+  source_type: string;
+  source_url: string | null;
 };
 
 type SidebarProps = {
@@ -99,21 +101,49 @@ export function Sidebar({
             <div className="text-xs font-semibold text-gray-500 uppercase px-2 py-1">
               Sources ({sourceIndex.length})
             </div>
-            {sourceIndex.map((source) => (
-              <button
-                key={source.id}
-                onClick={() => onSourceSelect(source.filename)}
-                className={`w-full text-left text-sm px-2 py-1 rounded hover:bg-gray-100 truncate ${
-                  selectedSource === source.filename
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-gray-700"
-                }`}
-                title={`${source.filename} (${source.status})`}
-              >
-                <span className="mr-1">{source.status === "ingested" ? "✓" : "○"}</span>
-                {source.filename}
-              </button>
-            ))}
+            {sourceIndex.map((source) => {
+              const typeIcon =
+                source.source_type === "pdf" ? "📄"
+                : source.source_type === "url" ? "🔗"
+                : "📝";
+              const statusIcon =
+                source.status === "ingested" ? "✓"
+                : source.status === "failed" ? "✗"
+                : "○";
+              return (
+                <div
+                  key={source.id}
+                  className={`flex items-center gap-1 text-sm px-2 py-1 rounded hover:bg-gray-100 ${
+                    selectedSource === source.filename
+                      ? "bg-blue-50 text-blue-700"
+                      : "text-gray-700"
+                  }`}
+                >
+                  <span className="text-gray-400">{statusIcon}</span>
+                  <span title={source.source_type} className="text-base leading-none">
+                    {typeIcon}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onSourceSelect(source.filename)}
+                    className="flex-1 text-left truncate hover:underline"
+                    title={source.source_url ?? `${source.filename} (${source.status})`}
+                  >
+                    {source.filename}
+                  </button>
+                  <a
+                    href={`/api/originals/${encodeURIComponent(source.id)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-gray-400 hover:text-gray-600"
+                    title="Open original"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    ↗
+                  </a>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
