@@ -1,5 +1,6 @@
 import { routeAgentRequest, getAgentByName } from "agents";
 import { r2Read, r2GetObject } from "./agent/r2";
+import { verifyAccessJwt } from "./auth";
 import type { WikiAgent } from "./agent/wiki-agent";
 
 export { WikiAgent } from "./agent/wiki-agent";
@@ -30,6 +31,14 @@ async function getWikiAgent(env: Env) {
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
+
+    // ---------- Cloudflare Access JWT verification ----------
+    // When the Worker is fronted by Cloudflare Zero Trust Access, every
+    // request must carry a valid `Cf-Access-Jwt-Assertion`. If
+    // CF_ACCESS_TEAM_DOMAIN and CF_ACCESS_POLICY_AUD are not configured
+    // (e.g. local dev), this is a no-op.
+    const authError = await verifyAccessJwt(request, env);
+    if (authError) return authError;
 
     // ---------- POST /api/ingest/file ----------
     if (request.method === "POST" && url.pathname === "/api/ingest/file") {

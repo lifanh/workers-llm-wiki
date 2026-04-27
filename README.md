@@ -162,6 +162,24 @@ With BYOK you do **not** need `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, or `GOOGLE_
 > aigateway(unified(`${provider}/${model}`)); // e.g. "google-ai-studio/gemini-2.5-pro"
 > ```
 
+## Cloudflare Zero Trust Access (optional)
+
+If you put this Worker behind a [Cloudflare Zero Trust Access](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/) application to gate access on the public Internet, the Worker can verify the Access-issued JWT (`Cf-Access-Jwt-Assertion`) on every incoming request — including WebSocket upgrades — using the [`jose`](https://www.npmjs.com/package/jose) library and your team's JWKS.
+
+1. In Cloudflare Zero Trust → **Access controls** → **Applications**, create/select the application protecting this Worker and copy the **Application Audience (AUD) Tag**.
+2. Set the two variables as Worker secrets:
+   ```bash
+   npx wrangler secret put CF_ACCESS_TEAM_DOMAIN
+   # e.g. https://<your-team-name>.cloudflareaccess.com
+   npx wrangler secret put CF_ACCESS_POLICY_AUD
+   # the AUD tag from step 1
+   ```
+3. Redeploy: `npm run deploy`.
+
+When **both** variables are set, every request must carry a valid Access JWT issued for your AUD/team domain — invalid or missing tokens are rejected with `403`. When either is unset (e.g. local dev) verification is skipped, so the existing `npm run dev` flow keeps working.
+
+See: [Validate JWTs — Cloudflare Workers example](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/#cloudflare-workers-example).
+
 ## Configuration Reference
 
 ### `wrangler.jsonc` — Infrastructure
@@ -191,6 +209,8 @@ Set in `.dev.vars` for local dev, or via `npx wrangler secret put <NAME>` for pr
 | `DEFAULT_CAPABLE_MODEL_PROVIDER` | Optional | Initial provider for the capable model |
 | `DEFAULT_CAPABLE_MODEL_NAME` | Optional | Initial name for the capable model |
 | `DEFAULT_CAPABLE_GATEWAY_ENABLED`| Optional | Set `"true"` to initially enable AI Gateway for capable model |
+| `CF_ACCESS_TEAM_DOMAIN` | Only when fronted by Cloudflare Access | Your team domain, e.g. `https://<team>.cloudflareaccess.com` |
+| `CF_ACCESS_POLICY_AUD` | Only when fronted by Cloudflare Access | The Application Audience (AUD) tag of the Access app |
 
 ### Runtime Config (changeable via chat)
 
