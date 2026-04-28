@@ -32,4 +32,10 @@
       "new_sqlite_classes": ["WikiAgent"],
     },
   ],
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "invocation_logs": true,
+    },
+  },
 }
