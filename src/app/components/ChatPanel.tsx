@@ -2,9 +2,39 @@ import { useState, useRef, useEffect } from "react";
 import type { useAgentChat } from "@cloudflare/ai-chat/react";
 import ReactMarkdown from "react-markdown";
 
+const STARTER_PROMPTS = [
+  "List all pages",
+  "Summarize the current wiki",
+  "Run a lint check",
+  "Suggest missing topics",
+];
+
 type ChatPanelProps = {
   chat: ReturnType<typeof useAgentChat>;
 };
+
+type StarterPromptChipsProps = {
+  prompts: string[];
+  onSelect: (prompt: string) => void;
+  className?: string;
+};
+
+function StarterPromptChips({ prompts, onSelect, className = "" }: StarterPromptChipsProps) {
+  return (
+    <div className={className}>
+      {prompts.map((prompt) => (
+        <button
+          key={prompt}
+          type="button"
+          onClick={() => onSelect(prompt)}
+          className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
+        >
+          {prompt}
+        </button>
+      ))}
+    </div>
+  );
+}
 
 export function ChatPanel({ chat }: ChatPanelProps) {
   const { messages, sendMessage, clearHistory, status } = chat;
@@ -14,12 +44,6 @@ export function ChatPanel({ chat }: ChatPanelProps) {
   const [urlValue, setUrlValue] = useState("");
   const [isIngestingUrl, setIsIngestingUrl] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const starterPrompts = [
-    "List all pages",
-    "Summarize the current wiki",
-    "Run a lint check",
-    "Suggest missing topics",
-  ];
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -132,18 +156,11 @@ export function ChatPanel({ chat }: ChatPanelProps) {
             <p className="mt-3 text-base leading-7 text-slate-500">
               Upload notes, ingest a URL, or ask the agent to summarize, lint, or expand your current knowledge base.
             </p>
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              {starterPrompts.map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => setInput(prompt)}
-                  className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
+            <StarterPromptChips
+              prompts={STARTER_PROMPTS}
+              onSelect={setInput}
+              className="mt-6 flex flex-wrap justify-center gap-3"
+            />
           </div>
         )}
 
@@ -262,18 +279,11 @@ export function ChatPanel({ chat }: ChatPanelProps) {
             </button>
           </form>
         )}
-        <div className="mb-3 flex flex-wrap gap-2">
-          {starterPrompts.map((prompt) => (
-            <button
-              key={prompt}
-              type="button"
-              onClick={() => setInput(prompt)}
-              className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-sky-300 hover:bg-sky-50 hover:text-sky-700"
-            >
-              {prompt}
-            </button>
-          ))}
-        </div>
+        <StarterPromptChips
+          prompts={STARTER_PROMPTS}
+          onSelect={setInput}
+          className="mb-3 flex flex-wrap gap-2"
+        />
         <form
           onSubmit={handleSubmit}
           className="flex flex-wrap items-center gap-3 rounded-[1.75rem] border border-slate-200 bg-white p-3 shadow-[0_16px_40px_rgba(15,23,42,0.06)]"

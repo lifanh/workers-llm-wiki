@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 
+const CATEGORIES = ["entity", "concept", "topic", "source"] as const;
+
 type PageEntry = {
   id: string;
   title: string;
@@ -39,7 +41,6 @@ export function Sidebar({
   onSourceSelect,
 }: SidebarProps) {
   const [query, setQuery] = useState("");
-  const categories = ["entity", "concept", "topic", "source"] as const;
 
   const normalizedQuery = query.trim().toLowerCase();
   const filteredPages = useMemo(
@@ -66,14 +67,14 @@ export function Sidebar({
   );
   const grouped = useMemo(
     () =>
-      categories.reduce(
+      CATEGORIES.reduce(
         (acc, cat) => {
           acc[cat] = filteredPages.filter((page) => page.category === cat);
           return acc;
         },
         {} as Record<string, PageEntry[]>,
       ),
-    [categories, filteredPages],
+    [filteredPages],
   );
   const hasResults = filteredPages.length > 0 || filteredSources.length > 0;
 
@@ -126,7 +127,7 @@ export function Sidebar({
               : "No matching pages or sources for this search."}
           </div>
         ) : (
-          categories.map((cat) => {
+          CATEGORIES.map((cat) => {
             const pages = grouped[cat];
             if (pages.length === 0) return null;
 
