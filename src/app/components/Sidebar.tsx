@@ -1,3 +1,7 @@
+import { useMemo, useState } from "react";
+
+const CATEGORIES = ["entity", "concept", "topic", "source"] as const;
+
 type PageEntry = {
   id: string;
   title: string;
@@ -36,76 +40,146 @@ export function Sidebar({
   onPageSelect,
   onSourceSelect,
 }: SidebarProps) {
-  const categories = ["entity", "concept", "topic", "source"] as const;
+  const [query, setQuery] = useState("");
 
-  const grouped = categories.reduce(
-    (acc, cat) => {
-      acc[cat] = pageIndex.filter((p) => p.category === cat);
-      return acc;
-    },
-    {} as Record<string, PageEntry[]>,
+  const normalizedQuery = query.trim().toLowerCase();
+  const filteredPages = useMemo(
+    () =>
+      normalizedQuery
+        ? pageIndex.filter((page) =>
+            [page.title, page.summary ?? "", page.category].some((value) =>
+              value.toLowerCase().includes(normalizedQuery),
+            ),
+          )
+        : pageIndex,
+    [normalizedQuery, pageIndex],
   );
+  const filteredSources = useMemo(
+    () =>
+      normalizedQuery
+        ? sourceIndex.filter((source) =>
+            [source.filename, source.source_type, source.source_url ?? "", source.status].some(
+              (value) => value.toLowerCase().includes(normalizedQuery),
+            ),
+          )
+        : sourceIndex,
+    [normalizedQuery, sourceIndex],
+  );
+  const grouped = useMemo(
+    () =>
+      CATEGORIES.reduce(
+        (acc, cat) => {
+          acc[cat] = filteredPages.filter((page) => page.category === cat);
+          return acc;
+        },
+        {} as Record<string, PageEntry[]>,
+      ),
+    [filteredPages],
+  );
+  const hasResults = filteredPages.length > 0 || filteredSources.length > 0;
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 flex flex-col h-full">
-      {/* Header */}
-      <div className="p-4 border-b border-gray-200">
-        <h1 className="text-lg font-bold">LLM Wiki</h1>
-        <div className="text-xs text-gray-500 mt-1">
-          {pageCount} pages · {sourceCount} sources
+    <aside className="flex h-full w-[21rem] shrink-0 flex-col border-r border-slate-200/80 bg-slate-950 text-slate-100">
+      <div className="border-b border-white/10 px-5 py-5">
+        <div className="inline-flex items-center rounded-full border border-sky-400/30 bg-sky-400/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-sky-200">
+          Knowledge workspace
+        </div>
+        <h1 className="mt-4 text-2xl font-semibold tracking-tight">LLM Wiki</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-300">
+          Explore pages, inspect sources, and keep the wiki synced with your latest context.
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+            <div className="text-xs text-slate-400">Pages</div>
+            <div className="mt-1 text-lg font-semibold text-white">{pageCount}</div>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-3">
+            <div className="text-xs text-slate-400">Sources</div>
+            <div className="mt-1 text-lg font-semibold text-white">{sourceCount}</div>
+          </div>
         </div>
         {currentOperation && (
-          <div className="text-xs text-blue-600 mt-1 animate-pulse">
+          <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-3 py-1 text-xs font-medium text-emerald-200">
+            <span className="h-2 w-2 rounded-full bg-emerald-300 animate-pulse" />
             {currentOperation}
           </div>
         )}
       </div>
 
-      {/* Page list */}
-      <div className="flex-1 overflow-y-auto p-2">
-        {pageIndex.length === 0 ? (
-          <div className="text-sm text-gray-400 p-2">
-            No pages yet. Start by uploading a source.
+      <div className="border-b border-white/10 px-5 py-4">
+        <label className="block text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+          Search library
+        </label>
+        <input
+          type="search"
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Find pages or sources"
+          className="mt-2 w-full rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:border-sky-400/60 focus:outline-none focus:ring-2 focus:ring-sky-400/20"
+        />
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-4 py-4">
+        {!hasResults ? (
+          <div className="rounded-3xl border border-dashed border-white/15 bg-white/5 px-4 py-6 text-sm text-slate-400">
+            {pageIndex.length === 0 && sourceIndex.length === 0
+              ? "No pages yet. Upload or ingest a source to seed the wiki."
+              : "No matching pages or sources for this search."}
           </div>
         ) : (
-          categories.map((cat) => {
+          CATEGORIES.map((cat) => {
             const pages = grouped[cat];
             if (pages.length === 0) return null;
 
             return (
-              <div key={cat} className="mb-3">
-                <div className="text-xs font-semibold text-gray-500 uppercase px-2 py-1">
-                  {cat}s ({pages.length})
+              <section key={cat} className="mb-4 rounded-3xl border border-white/8 bg-white/5 p-3">
+                <div className="mb-2 flex items-center justify-between px-1 py-1">
+                  <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                    {cat}s
+                  </div>
+                  <div className="rounded-full bg-white/8 px-2 py-1 text-[11px] font-medium text-slate-300">
+                    {pages.length}
+                  </div>
                 </div>
                 {pages.map((page) => (
                   <button
                     key={page.id}
                     onClick={() => onPageSelect(page.id)}
-                    className={`w-full text-left text-sm px-2 py-1 rounded hover:bg-gray-100 truncate ${
+                    className={`mb-1 w-full rounded-2xl border px-3 py-2 text-left transition hover:border-sky-300/40 hover:bg-white/10 ${
                       selectedPage === page.id
-                        ? "bg-blue-50 text-blue-700"
-                        : "text-gray-700"
+                        ? "border-sky-300/40 bg-sky-400/15 text-white shadow-[0_10px_24px_rgba(14,165,233,0.18)]"
+                        : "border-transparent text-slate-200"
                     }`}
                     title={page.summary ?? page.title}
                   >
-                    {page.title}
+                    <div className="truncate text-sm font-medium">{page.title}</div>
+                    {page.summary && (
+                      <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-400">
+                        {page.summary}
+                      </div>
+                    )}
                   </button>
                 ))}
-              </div>
+              </section>
             );
           })
         )}
 
-        {sourceIndex.length > 0 && (
-          <div className="mb-3 mt-4 border-t border-gray-200 pt-3">
-            <div className="text-xs font-semibold text-gray-500 uppercase px-2 py-1">
-              Sources ({sourceIndex.length})
+        {filteredSources.length > 0 && (
+          <section className="mt-5 rounded-3xl border border-white/8 bg-white/5 p-3">
+            <div className="mb-2 flex items-center justify-between px-1 py-1">
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-400">
+                Sources
+              </div>
+              <div className="rounded-full bg-white/8 px-2 py-1 text-[11px] font-medium text-slate-300">
+                {filteredSources.length}
+              </div>
             </div>
-            {sourceIndex.map((source) => {
+            {filteredSources.map((source) => {
               const typeIcon =
                 source.source_type === "pdf" ? "📄"
                 : source.source_type === "url" ? "🔗"
-                : "📝";
+                  : "📝";
               const statusIcon =
                 source.status === "ingested" ? "✓"
                 : source.status === "failed" ? "✗"
@@ -113,29 +187,32 @@ export function Sidebar({
               return (
                 <div
                   key={source.id}
-                  className={`flex items-center gap-1 text-sm px-2 py-1 rounded hover:bg-gray-100 ${
+                  className={`mb-1 flex items-center gap-2 rounded-2xl border px-3 py-2 text-sm transition hover:border-sky-300/40 hover:bg-white/10 ${
                     selectedSource === source.filename
-                      ? "bg-blue-50 text-blue-700"
-                      : "text-gray-700"
-                  }`}
+                      ? "border-sky-300/40 bg-sky-400/15 text-white shadow-[0_10px_24px_rgba(14,165,233,0.18)]"
+                      : "border-transparent text-slate-200"
+                   }`}
                 >
-                  <span className="text-gray-400">{statusIcon}</span>
+                  <span className="text-slate-400">{statusIcon}</span>
                   <span title={source.source_type} className="text-base leading-none">
                     {typeIcon}
                   </span>
                   <button
                     type="button"
                     onClick={() => onSourceSelect(source.filename)}
-                    className="flex-1 text-left truncate hover:underline"
+                    className="flex-1 text-left"
                     title={source.source_url ?? `${source.filename} (${source.status})`}
                   >
-                    {source.filename}
+                    <div className="truncate font-medium">{source.filename}</div>
+                    <div className="text-xs text-slate-400">
+                      {source.source_type} · {source.status}
+                    </div>
                   </button>
                   <a
                     href={`/api/originals/${encodeURIComponent(source.id)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs text-gray-400 hover:text-gray-600"
+                    className="text-xs text-slate-400 transition hover:text-sky-200"
                     title="Open original"
                     onClick={(e) => e.stopPropagation()}
                   >
@@ -144,9 +221,9 @@ export function Sidebar({
                 </div>
               );
             })}
-          </div>
+          </section>
         )}
       </div>
-    </div>
+    </aside>
   );
 }
